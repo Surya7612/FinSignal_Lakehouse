@@ -2,10 +2,12 @@
 
 __all__ = [
     "BronzeIngestionResult",
+    "GoldEventWindowResult",
     "GoldReconciliationResult",
     "SilverCleaningResult",
     "main",
     "run_bronze_ingestion",
+    "run_gold_event_window",
     "run_gold_reconciliation",
     "run_silver_cleaning",
 ]
@@ -39,4 +41,12 @@ def __getattr__(name: str):
         from src.pipelines.gold_reconciliation import run_gold_reconciliation
 
         return run_gold_reconciliation
+    if name == "GoldEventWindowResult":
+        from src.pipelines.gold_event_window import GoldEventWindowResult
+
+        return GoldEventWindowResult
+    if name == "run_gold_event_window":
+        from src.pipelines.gold_event_window import run_gold_event_window
+
+        return run_gold_event_window
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
