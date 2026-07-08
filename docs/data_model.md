@@ -4,7 +4,7 @@
 
 This document defines the data model for the FinSignal Lakehouse MVP.
 
-The MVP focuses on trade-position reconciliation and bounded event-window analytics. The core data entities are securities, prices, starting positions, trades, reported positions, filing-style events, and an injected issues manifest.
+The MVP focuses on trade-position reconciliation and bounded event-window analytics. The core data entities are securities, prices, corporate actions (stock splits only), starting positions, trades, reported positions, filing-style events, and an injected issues manifest.
 
 The data model supports three layers:
 
@@ -46,6 +46,7 @@ Examples:
 * detect duplicate trade IDs
 * detect missing prices
 * validate quantities and prices
+* apply cumulative stock-split adjustment factors
 
 ### Gold Layer
 
@@ -162,6 +163,37 @@ The MVP does not reconstruct full account history from inception. It reconstruct
 `starting quantity + cumulative buys - cumulative sells`
 
 Negative position quantities are allowed in the synthetic ledger and represent short positions. The reconciliation engine validates position consistency, not long-only portfolio constraints.
+
+---
+
+## 3.3b corporate_actions
+
+### Grain
+
+One row per corporate action event.
+
+### Raw Path
+
+`data/raw/corporate_actions/corporate_actions.jsonl`
+
+### Bronze Table
+
+`bronze_corporate_actions`
+
+### Columns
+
+| Column              | Type   | Description                  |
+| ------------------- | ------ | ---------------------------- |
+| corporate_action_id | string | Unique action identifier     |
+| security_id         | string | Internal security identifier |
+| action_type         | string | Supported type: STOCK_SPLIT |
+| effective_date      | date   | Split effective date         |
+| split_ratio         | double | Split ratio (e.g. 2.0)      |
+| description         | string | Human-readable note          |
+
+### Notes
+
+The MVP supports stock splits only. Split adjustment uses cumulative factors by security and date. This is a controlled extension, not a full corporate-actions engine.
 
 ---
 
@@ -384,7 +416,7 @@ One row per detected trade or price quality issue.
 | Column             | Description                                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------------------------ |
 | flag_id            | Unique quality flag                                                                                    |
-| flag_type          | DUPLICATE_TRADE, UNKNOWN_SECURITY, MISSING_PRICE, INVALID_QUANTITY, INVALID_PRICE, LATE_ARRIVING_TRADE |
+| flag_type          | DUPLICATE_TRADE, UNKNOWN_SECURITY, MISSING_PRICE, INVALID_QUANTITY, INVALID_PRICE, LATE_ARRIVING_TRADE, SPLIT_ADJUSTMENT_BREAK |
 | affected_entity    | trades, prices, securities                                                                             |
 | affected_record_id | Trade ID or relevant record ID                                                                         |
 | account_id         | Account identifier                                                                                     |
@@ -448,6 +480,7 @@ One row per detected reconciliation break.
 * TIMING_MISMATCH
 * LATE_ARRIVING_TRADE
 * MISSING_PRICE
+* SPLIT_ADJUSTMENT_BREAK
 * UNKNOWN_SECURITY
 * QUANTITY_MISMATCH
 * POSITION_NOT_REPORTED

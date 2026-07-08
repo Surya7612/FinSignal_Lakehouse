@@ -15,6 +15,7 @@ IssueType = Literal[
     "MISSING_PRICE",
     "INVALID_SECURITY_ID",
     "OUT_OF_ORDER_TRADE_EVENTS",
+    "SPLIT_ADJUSTMENT_BREAK",
 ]
 
 
@@ -72,6 +73,15 @@ class FilingEventRecord(TypedDict):
     event_date: str
     event_type: str
     event_summary: str
+
+
+class CorporateActionRecord(TypedDict):
+    corporate_action_id: str
+    security_id: str
+    action_type: str
+    effective_date: str
+    split_ratio: float
+    description: str
 
 
 class InjectedIssueRecord(TypedDict, total=False):

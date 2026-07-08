@@ -17,10 +17,12 @@ def build_event_window_metrics(
 
     Uses security-local trading day indexes and bounded joins only.
     """
+    price_col = "adjusted_close_price" if "adjusted_close_price" in prices_df.columns else "close_price"
+
     # 1) Price index per security.
     security_date_window = Window.partitionBy("security_id").orderBy("price_date")
     price_indexed = (
-        prices_df.select("security_id", "price_date", "close_price")
+        prices_df.select("security_id", "price_date", F.col(price_col).alias("close_price"))
         .withColumn("trading_day_index", F.row_number().over(security_date_window))
         .withColumn("prev_close_price", F.lag("close_price").over(security_date_window))
         .withColumn(

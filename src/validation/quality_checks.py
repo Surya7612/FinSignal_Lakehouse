@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
 
@@ -119,4 +119,99 @@ def build_trade_quality_flags(
         .unionByName(invalid_price_flags)
         .unionByName(late_arriving_flags)
         .dropDuplicates(["flag_id"])
+    )
+
+
+def build_split_adjustment_break_flags(
+    reported_positions_df: DataFrame,
+    corporate_actions_df: DataFrame,
+) -> DataFrame:
+    """
+    Flag split-adjustment breaks on reported positions around split effective date.
+
+    Heuristic:
+    - For each STOCK_SPLIT security/effective_date and account, compare
+      reported_quantity on effective_date vs previous trading day.
+    - If effective quantity is materially below expected split-adjusted level,
+      emit SPLIT_ADJUSTMENT_BREAK.
+    """
+    split_actions = corporate_actions_df.filter(F.col("action_type") == F.lit("STOCK_SPLIT")).select(
+        "security_id",
+        F.col("effective_date"),
+        "split_ratio",
+        "corporate_action_id",
+    )
+
+    current_day = reported_positions_df.alias("r").join(
+        split_actions.alias("s"),
+        on=(F.col("r.security_id") == F.col("s.security_id"))
+        & (F.col("r.position_date") == F.col("s.effective_date")),
+        how="inner",
+    ).select(
+        F.col("r.account_id").alias("account_id"),
+        F.col("r.security_id").alias("security_id"),
+        F.col("r.position_date").alias("position_date"),
+        F.col("r.reported_quantity").alias("effective_reported_quantity"),
+        F.col("s.split_ratio").alias("split_ratio"),
+        F.col("s.corporate_action_id").alias("corporate_action_id"),
+    )
+
+    previous_day = (
+        reported_positions_df.select(
+            "account_id",
+            "security_id",
+            F.col("position_date").alias("prev_position_date"),
+            F.col("reported_quantity").alias("prev_reported_quantity"),
+        )
+    )
+
+    paired = current_day.join(
+        previous_day,
+        on=[
+            "account_id",
+            "security_id",
+        ],
+        how="left",
+    ).filter(F.col("prev_position_date") < F.col("position_date"))
+
+    # nearest previous position date
+    win = Window.partitionBy("account_id", "security_id", "position_date").orderBy(
+        F.col("prev_position_date").desc()
+    )
+    paired = paired.withColumn("rn", F.row_number().over(win)).filter(F.col("rn") == 1)
+
+    expected_effective_qty = F.col("prev_reported_quantity") * F.col("split_ratio")
+    flagged = paired.filter(
+        F.col("prev_reported_quantity").isNotNull()
+        & F.col("effective_reported_quantity").isNotNull()
+        & (F.abs(F.col("effective_reported_quantity") - expected_effective_qty) > F.lit(1e-9))
+    )
+
+    return flagged.select(
+        F.sha2(
+            F.concat_ws(
+                "||",
+                F.lit("SPLIT_ADJUSTMENT_BREAK"),
+                F.col("account_id"),
+                F.col("security_id"),
+                F.col("position_date").cast("string"),
+                F.col("corporate_action_id"),
+            ),
+            256,
+        ).alias("flag_id"),
+        F.lit("SPLIT_ADJUSTMENT_BREAK").alias("flag_type"),
+        F.lit("reported_positions").alias("affected_entity"),
+        F.concat_ws(
+            "|",
+            F.col("account_id"),
+            F.col("security_id"),
+            F.col("position_date").cast("string"),
+        ).alias("affected_record_id"),
+        F.col("account_id"),
+        F.col("security_id"),
+        F.col("position_date").alias("flag_date"),
+        F.lit("HIGH").alias("severity"),
+        F.lit(
+            "Reported position does not align with expected split-adjusted quantity around split date."
+        ).alias("description"),
     )

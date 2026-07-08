@@ -32,6 +32,11 @@ BRONZE_DATASETS: list[dict[str, str]] = [
         "bronze_path": "data/bronze/prices",
     },
     {
+        "name": "corporate_actions",
+        "raw_path": "data/raw/corporate_actions",
+        "bronze_path": "data/bronze/corporate_actions",
+    },
+    {
         "name": "starting_positions",
         "raw_path": "data/raw/starting_positions",
         "bronze_path": "data/bronze/starting_positions",

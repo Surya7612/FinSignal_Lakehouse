@@ -25,6 +25,16 @@ def build_position_reconstruction(
     """
     valid_security_ids = securities_df.select("security_id").dropDuplicates()
 
+    trade_quantity_col = "adjusted_quantity" if "adjusted_quantity" in trades_df.columns else "quantity"
+    starting_quantity_col = (
+        "adjusted_quantity" if "adjusted_quantity" in starting_positions_df.columns else "quantity"
+    )
+    reported_quantity_col = (
+        "adjusted_reported_quantity"
+        if "adjusted_reported_quantity" in reported_positions_df.columns
+        else "reported_quantity"
+    )
+
     # Exclude trades with unknown securities from quantity math.
     valid_trades = trades_df.join(valid_security_ids, on="security_id", how="inner")
 
@@ -32,10 +42,10 @@ def build_position_reconstruction(
     daily_trade_activity = (
         valid_trades.groupBy("account_id", "security_id", F.col("trade_date").alias("position_date"))
         .agg(
-            F.sum(F.when(F.col("side") == "BUY", F.col("quantity")).otherwise(F.lit(0.0))).alias(
+            F.sum(F.when(F.col("side") == "BUY", F.col(trade_quantity_col)).otherwise(F.lit(0.0))).alias(
                 "daily_buy_quantity"
             ),
-            F.sum(F.when(F.col("side") == "SELL", F.col("quantity")).otherwise(F.lit(0.0))).alias(
+            F.sum(F.when(F.col("side") == "SELL", F.col(trade_quantity_col)).otherwise(F.lit(0.0))).alias(
                 "daily_sell_quantity"
             ),
         )
@@ -59,7 +69,7 @@ def build_position_reconstruction(
     # Day 0 baseline quantity by account/security (defaults to 0 if missing).
     starting_baseline = (
         starting_positions_df.groupBy("account_id", "security_id")
-        .agg(F.max(F.col("quantity")).alias("starting_quantity"))
+        .agg(F.max(F.col(starting_quantity_col)).alias("starting_quantity"))
         .withColumn("starting_quantity", F.coalesce(F.col("starting_quantity"), F.lit(0.0)))
     )
 
@@ -99,7 +109,7 @@ def build_position_reconstruction(
         "account_id",
         "security_id",
         "position_date",
-        F.col("reported_quantity").alias("reported_position"),
+        F.col(reported_quantity_col).alias("reported_position"),
     )
     base_df = base_df.join(
         reported_df,
@@ -111,6 +121,9 @@ def build_position_reconstruction(
     flag_signals = (
         trade_quality_flags_df.groupBy("account_id", "security_id", F.col("flag_date").alias("position_date"))
         .agg(
+            F.max(
+                F.when(F.col("flag_type") == "SPLIT_ADJUSTMENT_BREAK", F.lit(1)).otherwise(F.lit(0))
+            ).alias("has_split_adjustment_break_flag"),
             F.max(F.when(F.col("flag_type") == "DUPLICATE_TRADE", F.lit(1)).otherwise(F.lit(0))).alias(
                 "has_duplicate_trade_flag"
             ),
@@ -124,6 +137,10 @@ def build_position_reconstruction(
     )
     base_df = (
         base_df.join(flag_signals, on=["account_id", "security_id", "position_date"], how="left")
+        .withColumn(
+            "has_split_adjustment_break_flag",
+            F.coalesce(F.col("has_split_adjustment_break_flag"), F.lit(0)),
+        )
         .withColumn("has_duplicate_trade_flag", F.coalesce(F.col("has_duplicate_trade_flag"), F.lit(0)))
         .withColumn(
             "has_late_arriving_trade_flag", F.coalesce(F.col("has_late_arriving_trade_flag"), F.lit(0))
@@ -152,6 +169,10 @@ def build_position_reconstruction(
     base_df = base_df.withColumn(
         "break_reason_code",
         F.when(F.col("reported_position").isNull(), F.lit("POSITION_NOT_REPORTED"))
+        .when(
+            diff_non_zero & (F.col("has_split_adjustment_break_flag") == F.lit(1)),
+            F.lit("SPLIT_ADJUSTMENT_BREAK"),
+        )
         .when(diff_non_zero & (F.col("has_duplicate_trade_flag") == F.lit(1)), F.lit("DUPLICATE_TRADE"))
         .when(
             diff_non_zero & (F.col("has_late_arriving_trade_flag") == F.lit(1)),
@@ -207,6 +228,7 @@ def build_position_reconstruction(
             F.when(F.col("is_break") == 0, F.lit("MATCH"))
             .when(
                 F.col("segment_first_reason").isin(
+                    "SPLIT_ADJUSTMENT_BREAK",
                     "DUPLICATE_TRADE",
                     "LATE_ARRIVING_TRADE",
                     "MISSING_PRICE",

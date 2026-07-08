@@ -15,6 +15,7 @@ import pandas as pd
 
 from src.data_generation import config
 from src.data_generation.schemas import (
+    CorporateActionRecord,
     FilingEventRecord,
     InjectedIssueRecord,
     PriceRecord,
@@ -59,6 +60,7 @@ class GenerationSummary:
 
     securities: int = 0
     prices: int = 0
+    corporate_actions: int = 0
     starting_positions: int = 0
     trades: int = 0
     reported_positions: int = 0
@@ -102,6 +104,7 @@ class LedgerGenerator:
     # Clean ledger artifacts (pre-injection).
     self.securities: list[SecurityRecord] = []
     self.prices: list[PriceRecord] = []
+    self.corporate_actions: list[CorporateActionRecord] = []
     self.starting_positions: list[StartingPositionRecord] = []
     self.clean_trades: list[TradeRecord] = []
     self.reported_positions: list[ReportedPositionRecord] = []
@@ -437,6 +440,109 @@ class LedgerGenerator:
 
     self.filing_events = records
 
+  def generate_corporate_actions(self) -> None:
+    """
+    Generate a single in-window stock split corporate action.
+
+    This is a controlled MVP extension and intentionally supports STOCK_SPLIT
+    only (no dividends/mergers/spin-offs).
+    """
+    # Pick a deterministic mid-window effective date so both pre/post windows exist.
+    effective_day = self.trading_days[min(12, len(self.trading_days) - 1)]
+    split_security_id = "SEC002"
+    self.corporate_actions = [
+      CorporateActionRecord(
+        corporate_action_id="CA0001",
+        security_id=split_security_id,
+        action_type="STOCK_SPLIT",
+        effective_date=_iso_date(effective_day),
+        split_ratio=2.0,
+        description="2-for-1 stock split (controlled synthetic corporate action).",
+      )
+    ]
+
+  def _apply_stock_split_effects(self) -> None:
+    """
+    Apply raw split effects to reported positions and prices on/after effective_date.
+
+    Trades remain in their original share units; silver split-adjustment factors
+    normalize pre-split trade quantities/prices to post-split basis.
+    """
+    trades_df = self._trades_dataframe(self.clean_trades)
+
+    for action in self.corporate_actions:
+      if action["action_type"] != "STOCK_SPLIT":
+        continue
+
+      security_id = action["security_id"]
+      effective_date = action["effective_date"]
+      ratio = float(action["split_ratio"])
+
+      accounts = sorted(
+        {
+          reported["account_id"]
+          for reported in self.reported_positions
+          if reported["security_id"] == security_id
+        }
+      )
+
+      for account_id in accounts:
+        post_split_running: float | None = None
+
+        for trade_day in self.trading_days:
+          position_date = _iso_date(trade_day)
+          reported = next(
+            (
+              row
+              for row in self.reported_positions
+              if row["account_id"] == account_id
+              and row["security_id"] == security_id
+              and row["position_date"] == position_date
+            ),
+            None,
+          )
+          if reported is None:
+            continue
+
+          net_quantity = 0.0
+          if not trades_df.empty:
+            pair_day = trades_df[
+              (trades_df["account_id"] == account_id)
+              & (trades_df["security_id"] == security_id)
+              & (trades_df["trade_date"] == position_date)
+            ]
+            for _, trade_row in pair_day.iterrows():
+              signed = (
+                float(trade_row["quantity"])
+                if trade_row["side"] == "BUY"
+                else -float(trade_row["quantity"])
+              )
+              net_quantity += signed
+
+          if position_date < effective_date:
+            continue
+
+          if position_date == effective_date:
+            post_split_running = round(float(reported["reported_quantity"]) * ratio, 4)
+            reported["reported_quantity"] = post_split_running
+          else:
+            if post_split_running is None:
+              post_split_running = round(float(reported["reported_quantity"]) * ratio, 4)
+            else:
+              post_split_running = round(post_split_running + net_quantity, 4)
+            reported["reported_quantity"] = post_split_running
+
+      for price in self.prices:
+        if price["security_id"] == security_id and price["price_date"] >= effective_date:
+          price["open_price"] = round(price["open_price"] / ratio, 4)
+          price["high_price"] = round(price["high_price"] / ratio, 4)
+          price["low_price"] = round(price["low_price"] / ratio, 4)
+          price["close_price"] = round(price["close_price"] / ratio, 4)
+
+    self._price_lookup = {
+      (row["security_id"], row["price_date"]): row["close_price"] for row in self.prices
+    }
+
   # -------------------------------------------------------------------------
   # Step 6 — Controlled issue injection
   # -------------------------------------------------------------------------
@@ -548,6 +654,7 @@ class LedgerGenerator:
       self._inject_late_arriving_trade,
       self._inject_missing_price,
       self._inject_invalid_security_id,
+      self._inject_split_adjustment_break,
     ]
 
     for injector in injectors:
@@ -805,6 +912,50 @@ class LedgerGenerator:
     )
     return recorded is not None
 
+  def _inject_split_adjustment_break(self) -> bool:
+    """
+    Introduce one reported-position inconsistency around split effective date.
+
+    This creates a controlled SPLIT_ADJUSTMENT_BREAK case for downstream split
+    adjustment quality checks.
+    """
+    if not self.corporate_actions or not self.reported_positions:
+      return False
+
+    split = self.corporate_actions[0]
+    target_security = split["security_id"]
+    target_date = split["effective_date"]
+    ratio = split["split_ratio"]
+
+    candidates = [
+      row
+      for row in self.reported_positions
+      if row["security_id"] == target_security and row["position_date"] == target_date
+    ]
+    if not candidates:
+      return False
+
+    target = candidates[0]
+    original_qty = target["reported_quantity"]
+    # Apply an intentionally incorrect split interpretation.
+    target["reported_quantity"] = round(original_qty / ratio, 4)
+    record_id = f"{target['account_id']}|{target['security_id']}|{target['position_date']}"
+
+    recorded = self._record_issue(
+      issue_type="SPLIT_ADJUSTMENT_BREAK",
+      affected_entity="reported_positions",
+      affected_record_id=record_id,
+      account_id=target["account_id"],
+      security_id=target["security_id"],
+      issue_date=target["position_date"],
+      expected_detection_category="SPLIT_ADJUSTMENT_BREAK",
+      short_description=(
+        f"Altered reported quantity from {original_qty} to {target['reported_quantity']} "
+        f"on split effective date using incorrect split handling."
+      ),
+    )
+    return recorded is not None
+
   def _inject_out_of_order_trade_events(self) -> bool:
     """Record that raw trades will be shuffled before persistence."""
     recorded = self._record_issue(
@@ -838,6 +989,7 @@ class LedgerGenerator:
 
     _write_jsonl(self.securities, paths["securities"])
     _write_jsonl(self.raw_prices, paths["prices"])
+    _write_jsonl(self.corporate_actions, paths["corporate_actions"])
     _write_jsonl(self.starting_positions, paths["starting_positions"])
     _write_jsonl(self._trades_for_output(), paths["trades"])
     _write_jsonl(self.reported_positions, paths["reported_positions"])
@@ -907,6 +1059,8 @@ class LedgerGenerator:
     self.compute_expected_positions()
     self.generate_reported_positions()
     self.generate_filing_events()
+    self.generate_corporate_actions()
+    self._apply_stock_split_effects()
 
     # --- Controlled corruption ---
     self.inject_issues()
@@ -922,6 +1076,7 @@ class LedgerGenerator:
     return GenerationSummary(
       securities=len(self.securities),
       prices=len(self.raw_prices),
+      corporate_actions=len(self.corporate_actions),
       starting_positions=len(self.starting_positions),
       trades=len(self.raw_trades),
       reported_positions=len(self.reported_positions),
@@ -944,6 +1099,7 @@ def _print_summary(summary: GenerationSummary) -> None:
   print("-" * 60)
   print(f"Securities generated:              {summary.securities}")
   print(f"Price records generated:           {summary.prices}")
+  print(f"Corporate actions generated:       {summary.corporate_actions}")
   print(f"Starting positions generated:      {summary.starting_positions}")
   print(f"Reported positions generated:      {summary.reported_positions}")
   print(f"Filing events generated:           {summary.filing_events}")

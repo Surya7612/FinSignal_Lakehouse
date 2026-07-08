@@ -101,6 +101,7 @@ RAW_DATA_ROOT: Path = PROJECT_ROOT / "data" / "raw"
 OUTPUT_PATHS: dict[str, Path] = {
     "securities": RAW_DATA_ROOT / "securities" / "securities.jsonl",
     "prices": RAW_DATA_ROOT / "prices" / "prices.jsonl",
+    "corporate_actions": RAW_DATA_ROOT / "corporate_actions" / "corporate_actions.jsonl",
     "starting_positions": RAW_DATA_ROOT / "starting_positions" / "starting_positions.jsonl",
     "trades": RAW_DATA_ROOT / "trades" / "trades.jsonl",
     "reported_positions": RAW_DATA_ROOT / "reported_positions" / "reported_positions.jsonl",

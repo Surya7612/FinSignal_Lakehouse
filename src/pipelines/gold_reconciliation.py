@@ -67,6 +67,10 @@ def _build_reconciliation_breaks(position_reconstruction_df: DataFrame) -> DataF
             F.lit("No reported position exists for this account/security/date."),
         )
         .when(
+            F.col("break_reason_code") == F.lit("SPLIT_ADJUSTMENT_BREAK"),
+            F.lit("Difference aligns with split-adjustment break flags on this date."),
+        )
+        .when(
             F.col("break_reason_code") == F.lit("DUPLICATE_TRADE"),
             F.lit("Difference aligns with duplicate-trade flags on this date."),
         )

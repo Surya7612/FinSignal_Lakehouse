@@ -15,8 +15,12 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from src.algorithms.split_adjustment import attach_split_factor_by_date, build_split_factors
 from src.utils.io import PROJECT_ROOT, create_spark_session
-from src.validation.quality_checks import build_trade_quality_flags
+from src.validation.quality_checks import (
+    build_split_adjustment_break_flags,
+    build_trade_quality_flags,
+)
 
 BRONZE_METADATA_COLUMNS = [
     "_ingested_at",
@@ -35,6 +39,11 @@ SILVER_DATASETS: list[dict[str, str]] = [
         "name": "prices_clean",
         "bronze_path": "data/bronze/prices",
         "silver_path": "data/silver/prices_clean",
+    },
+    {
+        "name": "corporate_actions_clean",
+        "bronze_path": "data/bronze/corporate_actions",
+        "silver_path": "data/silver/corporate_actions_clean",
     },
     {
         "name": "starting_positions_clean",
@@ -117,6 +126,20 @@ def clean_prices(df: DataFrame) -> DataFrame:
             F.col("low_price").cast("double").alias("low_price"),
             F.col("close_price").cast("double").alias("close_price"),
             F.col("volume").cast("long").alias("volume"),
+            *_select_metadata(df),
+        )
+    )
+
+
+def clean_corporate_actions(df: DataFrame) -> DataFrame:
+    return _with_silver_metadata(
+        df.select(
+            _normalize_text("corporate_action_id").alias("corporate_action_id"),
+            _normalize_id("security_id").alias("security_id"),
+            _normalize_id("action_type").alias("action_type"),
+            F.to_date("effective_date").alias("effective_date"),
+            F.col("split_ratio").cast("double").alias("split_ratio"),
+            _normalize_text("description").alias("description"),
             *_select_metadata(df),
         )
     )
@@ -219,6 +242,9 @@ def run_silver_cleaning(
         bronze_prices = _load_bronze_dataset(
             session, bronze_path="data/bronze/prices", project_root=project_root
         )
+        bronze_corporate_actions = _load_bronze_dataset(
+            session, bronze_path="data/bronze/corporate_actions", project_root=project_root
+        )
         bronze_starting_positions = _load_bronze_dataset(
             session, bronze_path="data/bronze/starting_positions", project_root=project_root
         )
@@ -234,20 +260,82 @@ def run_silver_cleaning(
 
         silver_securities = clean_securities(bronze_securities)
         silver_prices = clean_prices(bronze_prices)
+        silver_corporate_actions = clean_corporate_actions(bronze_corporate_actions)
         silver_starting_positions = clean_starting_positions(bronze_starting_positions)
         silver_trades = clean_trades(bronze_trades)
         silver_reported_positions = clean_reported_positions(bronze_reported_positions)
         silver_events = clean_events(bronze_events)
 
+        split_factors = build_split_factors(
+            prices_df=silver_prices,
+            corporate_actions_df=silver_corporate_actions,
+        )
+
+        silver_prices = (
+            attach_split_factor_by_date(
+                silver_prices,
+                date_col="price_date",
+                split_factors_df=split_factors,
+            )
+            .withColumn("adjusted_open_price", F.col("open_price") / F.col("split_adjustment_factor"))
+            .withColumn("adjusted_high_price", F.col("high_price") / F.col("split_adjustment_factor"))
+            .withColumn("adjusted_low_price", F.col("low_price") / F.col("split_adjustment_factor"))
+            .withColumn("adjusted_close_price", F.col("close_price") / F.col("split_adjustment_factor"))
+        )
+
+        silver_starting_positions = (
+            attach_split_factor_by_date(
+                silver_starting_positions,
+                date_col="position_date",
+                split_factors_df=split_factors,
+            )
+            .withColumn("adjusted_quantity", F.col("quantity") * F.col("split_adjustment_factor"))
+        )
+
+        silver_trades = (
+            attach_split_factor_by_date(
+                silver_trades,
+                date_col="trade_date",
+                split_factors_df=split_factors,
+            )
+            .withColumn("adjusted_quantity", F.col("quantity") * F.col("split_adjustment_factor"))
+            .withColumn(
+                "adjusted_execution_price",
+                F.col("execution_price") / F.col("split_adjustment_factor"),
+            )
+        )
+
+        silver_reported_positions = (
+            attach_split_factor_by_date(
+                silver_reported_positions,
+                date_col="position_date",
+                split_factors_df=split_factors,
+            )
+            .withColumn(
+                "adjusted_reported_quantity",
+                F.col("reported_quantity") * F.col("split_adjustment_factor"),
+            )
+        )
+
         flags_df = build_trade_quality_flags(
             trades_df=silver_trades,
             securities_df=silver_securities,
             prices_df=silver_prices,
-        ).withColumn("_silver_processed_at", F.current_timestamp())
+        )
+        split_flags_df = build_split_adjustment_break_flags(
+            reported_positions_df=silver_reported_positions,
+            corporate_actions_df=silver_corporate_actions,
+        )
+        flags_df = (
+            flags_df.unionByName(split_flags_df)
+            .dropDuplicates(["flag_id"])
+            .withColumn("_silver_processed_at", F.current_timestamp())
+        )
 
         outputs = [
             ("securities_clean", silver_securities),
             ("prices_clean", silver_prices),
+            ("corporate_actions_clean", silver_corporate_actions),
             ("starting_positions_clean", silver_starting_positions),
             ("trades_clean", silver_trades),
             ("reported_positions_clean", silver_reported_positions),
