@@ -1,0 +1,5 @@
+{"event_id":"EVT0001","security_id":"SEC001","event_date":"2025-01-07","event_type":"EARNINGS_RELEASE","event_summary":"Apple Inc. earnings release on 2025-01-07"}
+{"event_id":"EVT0002","security_id":"SEC002","event_date":"2025-01-09","event_type":"SEC_10K","event_summary":"Microsoft Corporation sec 10k on 2025-01-09"}
+{"event_id":"EVT0003","security_id":"SEC003","event_date":"2025-01-17","event_type":"SEC_10Q","event_summary":"JPMorgan Chase & Co. sec 10q on 2025-01-17"}
+{"event_id":"EVT0004","security_id":"SEC004","event_date":"2025-01-21","event_type":"DIVIDEND_ANNOUNCEMENT","event_summary":"Exxon Mobil Corporation dividend announcement on 2025-01-21"}
+{"event_id":"EVT0005","security_id":"SEC005","event_date":"2025-01-22","event_type":"GUIDANCE_UPDATE","event_summary":"Johnson & Johnson guidance update on 2025-01-22"}

@@ -1,0 +1,5 @@
+{"security_id":"SEC001","ticker":"AAPL","company_name":"Apple Inc.","exchange":"NASDAQ","sector":"Technology","is_active":true}
+{"security_id":"SEC002","ticker":"MSFT","company_name":"Microsoft Corporation","exchange":"NASDAQ","sector":"Technology","is_active":true}
+{"security_id":"SEC003","ticker":"JPM","company_name":"JPMorgan Chase & Co.","exchange":"NYSE","sector":"Financials","is_active":true}
+{"security_id":"SEC004","ticker":"XOM","company_name":"Exxon Mobil Corporation","exchange":"NYSE","sector":"Energy","is_active":true}
+{"security_id":"SEC005","ticker":"JNJ","company_name":"Johnson & Johnson","exchange":"NYSE","sector":"Healthcare","is_active":true}
