@@ -35,6 +35,7 @@ class InvestigationState(TypedDict, total=False):
     quality_flags: list[dict[str, Any]]
     event_context: list[dict[str, Any]]
     retrieved_evidence: list[dict[str, Any]]
+    exact_metadata_evidence_found: bool
     investigation_packet: dict[str, Any]
 
 
@@ -45,6 +46,78 @@ def _resolve_path(relative_path: str, project_root: Path) -> Path:
 def _row_to_dict(row: Any) -> dict[str, Any]:
     data = row.asDict(recursive=True)
     return {k: (str(v) if v is not None else None) for k, v in data.items()}
+
+
+def _parse_source_tables(metadata: dict[str, Any]) -> list[str]:
+    source_tables_raw = metadata.get("source_tables", "")
+    try:
+        return json.loads(source_tables_raw) if source_tables_raw else []
+    except json.JSONDecodeError:
+        return [source_tables_raw] if source_tables_raw else []
+
+
+def _evidence_from_chroma_row(document_id: str, text: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "document_id": document_id,
+        "document_type": metadata.get("document_type", ""),
+        "account_id": metadata.get("account_id", ""),
+        "security_id": metadata.get("security_id", ""),
+        "position_date": metadata.get("position_date", ""),
+        "event_date": metadata.get("event_date", ""),
+        "title": metadata.get("title", ""),
+        "text": text,
+        "source_tables": _parse_source_tables(metadata),
+    }
+
+
+def _matches_exact_metadata(
+    metadata: dict[str, Any],
+    *,
+    account_id: str,
+    security_id: str,
+    target_date: str,
+) -> bool:
+    if metadata.get("account_id") != account_id:
+        return False
+    if metadata.get("security_id") != security_id:
+        return False
+    position_date = metadata.get("position_date") or ""
+    event_date = metadata.get("event_date") or ""
+    return position_date == target_date or event_date == target_date
+
+
+DOCUMENT_TYPE_INVESTIGATION_PRIORITY = {
+    "RECONCILIATION_BREAK_SUMMARY": 0,
+    "TRADE_QUALITY_SUMMARY": 1,
+    "EVENT_WINDOW_SUMMARY": 2,
+}
+
+
+def _investigation_priority(metadata: dict[str, Any]) -> int:
+    return DOCUMENT_TYPE_INVESTIGATION_PRIORITY.get(metadata.get("document_type", ""), 99)
+
+
+def _append_unique_evidence(
+    ordered: list[dict[str, Any]],
+    seen_ids: set[str],
+    *,
+    document_ids: list[str],
+    documents: list[str],
+    metadatas: list[dict[str, Any]],
+    top_k: int,
+    row_sort_key: Any | None = None,
+) -> None:
+    sort_key = row_sort_key or (lambda row: row[0])
+    for doc_id, text, metadata in sorted(
+        zip(document_ids, documents, metadatas, strict=False),
+        key=sort_key,
+    ):
+        if doc_id in seen_ids or len(ordered) >= top_k:
+            if len(ordered) >= top_k:
+                break
+            continue
+        seen_ids.add(doc_id)
+        ordered.append(_evidence_from_chroma_row(doc_id, text, metadata))
 
 
 def _load_silver_events(session: SparkSession, project_root: Path) -> DataFrame:
@@ -196,7 +269,7 @@ def run_investigation_graph(
         def retrieve_evidence(state: InvestigationState) -> InvestigationState:
             index_path = _resolve_path("data/retrieval/chroma_index", project_root)
             if not index_path.exists():
-                return {"retrieved_evidence": []}
+                return {"retrieved_evidence": [], "exact_metadata_evidence_found": False}
 
             embeddings = HuggingFaceEmbeddings(
                 model_name=MODEL_NAME,
@@ -207,34 +280,98 @@ def run_investigation_graph(
                 persist_directory=str(index_path),
                 embedding_function=embeddings,
             )
-            retriever = vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": top_k},
-            )
-            docs = retriever.invoke(state["query"])
+            collection = vectorstore._collection
 
-            evidence = []
-            for doc in docs:
-                md = doc.metadata or {}
-                source_tables_raw = md.get("source_tables", "")
-                try:
-                    source_tables = json.loads(source_tables_raw) if source_tables_raw else []
-                except json.JSONDecodeError:
-                    source_tables = [source_tables_raw] if source_tables_raw else []
-                evidence.append(
-                    {
-                        "document_type": md.get("document_type", ""),
-                        "account_id": md.get("account_id", ""),
-                        "security_id": md.get("security_id", ""),
-                        "position_date": md.get("position_date", ""),
-                        "event_date": md.get("event_date", ""),
-                        "title": md.get("title", ""),
-                        "text": doc.page_content,
-                        "metadata": md,
-                        "source_tables": source_tables,
-                    }
+            account_id = state.get("account_id")
+            security_id = state.get("security_id")
+            target_date = state.get("target_date")
+
+            ordered: list[dict[str, Any]] = []
+            seen_ids: set[str] = set()
+            exact_metadata_evidence_found = False
+
+            if account_id and security_id and target_date:
+                exact_rows = collection.get(
+                    where={
+                        "$and": [
+                            {"account_id": {"$eq": account_id}},
+                            {"security_id": {"$eq": security_id}},
+                        ]
+                    },
+                    include=["documents", "metadatas"],
                 )
-            return {"retrieved_evidence": evidence}
+                exact_ids: list[str] = []
+                exact_documents: list[str] = []
+                exact_metadatas: list[dict[str, Any]] = []
+                for doc_id, text, metadata in zip(
+                    exact_rows.get("ids", []),
+                    exact_rows.get("documents", []),
+                    exact_rows.get("metadatas", []),
+                    strict=False,
+                ):
+                    if _matches_exact_metadata(
+                        metadata,
+                        account_id=account_id,
+                        security_id=security_id,
+                        target_date=target_date,
+                    ):
+                        exact_ids.append(doc_id)
+                        exact_documents.append(text)
+                        exact_metadatas.append(metadata)
+
+                if exact_ids:
+                    exact_metadata_evidence_found = True
+                _append_unique_evidence(
+                    ordered,
+                    seen_ids,
+                    document_ids=exact_ids,
+                    documents=exact_documents,
+                    metadatas=exact_metadatas,
+                    top_k=top_k,
+                    row_sort_key=lambda row: (_investigation_priority(row[2]), row[0]),
+                )
+
+            elif security_id:
+                security_rows = collection.get(
+                    where={"security_id": {"$eq": security_id}},
+                    include=["documents", "metadatas"],
+                )
+                security_ids = security_rows.get("ids", [])
+                if security_ids:
+                    exact_metadata_evidence_found = True
+                _append_unique_evidence(
+                    ordered,
+                    seen_ids,
+                    document_ids=security_ids,
+                    documents=security_rows.get("documents", []),
+                    metadatas=security_rows.get("metadatas", []),
+                    top_k=top_k,
+                )
+
+            if len(ordered) < top_k:
+                query_embedding = embeddings.embed_query(state["query"])
+                semantic_rows = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=top_k * 3,
+                    include=["documents", "metadatas"],
+                )
+                _append_unique_evidence(
+                    ordered,
+                    seen_ids,
+                    document_ids=semantic_rows.get("ids", [[]])[0],
+                    documents=semantic_rows.get("documents", [[]])[0],
+                    metadatas=semantic_rows.get("metadatas", [[]])[0],
+                    top_k=top_k,
+                )
+
+            ranked_evidence = [
+                {**item, "rank": index}
+                for index, item in enumerate(ordered[:top_k], start=1)
+            ]
+            return {
+                "retrieved_evidence": ranked_evidence,
+                "exact_metadata_evidence_found": exact_metadata_evidence_found,
+            }
 
         def build_investigation_packet(state: InvestigationState) -> InvestigationState:
             structured_break = state.get("structured_break")
@@ -280,6 +417,10 @@ def run_investigation_graph(
                 "Deterministic workflow: regex parsing + direct parquet lookups + vector retrieval.",
                 "No LLM generation used; output is template-based.",
             ]
+            if state.get("exact_metadata_evidence_found"):
+                confidence_notes.append("Exact metadata-filtered evidence found.")
+            else:
+                confidence_notes.append("Semantic retrieval fallback used.")
             if structured_break:
                 confidence_notes.append("Confidence higher because exact structured break row was found.")
             else:
@@ -290,6 +431,7 @@ def run_investigation_graph(
                 "structured_break": structured_break,
                 "quality_flags": quality_flags,
                 "event_context": event_context,
+                "retrieved_evidence": retrieved,
                 "retrieved_evidence_titles": [row.get("title", "") for row in retrieved],
                 "confidence_notes": confidence_notes,
                 "missing_data_notes": missing_data_notes,
