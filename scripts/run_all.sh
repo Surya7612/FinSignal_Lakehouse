@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
+export PYTHONPATH="${ROOT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
 
 SEED="${SEED:-42}"
 PYTHON="${PYTHON:-${ROOT_DIR}/.venv/bin/python}"
@@ -52,7 +53,7 @@ run_step "Investigation corpus" "${PYTHON}" -m src.retrieval.build_investigation
 run_step "Vector index" "${PYTHON}" -m src.retrieval.build_vector_index --run-id "vector_001"
 
 if command -v cmake >/dev/null 2>&1; then
-  run_step "Build C++ reference engine" bash scripts/build_cpp_engine.sh
+  run_step "Build C++ reference engine" env PYTHON="${PYTHON}" bash scripts/build_cpp_engine.sh
 else
   echo
   echo "==> Skipping C++ build (cmake not found)"
