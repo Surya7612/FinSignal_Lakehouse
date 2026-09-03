@@ -1,8 +1,8 @@
 """
 Silver cleaning pipeline for FinSignal Lakehouse.
 
-Reads bronze Parquet datasets, enforces basic typing and normalization,
-preserves bronze metadata, and writes cleaned silver Parquet outputs.
+Reads bronze datasets, enforces basic typing and normalization,
+preserves bronze metadata, and writes cleaned silver table outputs.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from src.algorithms.split_adjustment import attach_split_factor_by_date, build_split_factors
-from src.utils.io import PROJECT_ROOT, create_spark_session
+from src.utils.io import PROJECT_ROOT, STORAGE_FORMAT, create_spark_session, read_table, write_table
 from src.validation.quality_checks import (
     build_split_adjustment_break_flags,
     build_trade_quality_flags,
@@ -209,10 +209,9 @@ def clean_events(df: DataFrame) -> DataFrame:
     )
 
 
-def _write_parquet(df: DataFrame, path: Path) -> int:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _write_table(df: DataFrame, path: Path) -> int:
     row_count = df.count()
-    df.write.mode("overwrite").parquet(str(path))
+    write_table(df, path)
     return row_count
 
 
@@ -222,7 +221,7 @@ def _load_bronze_dataset(
     bronze_path: str,
     project_root: Path,
 ) -> DataFrame:
-    return spark.read.parquet(str(_resolve_path(bronze_path, project_root)))
+    return read_table(spark, _resolve_path(bronze_path, project_root))
 
 
 def run_silver_cleaning(
@@ -346,7 +345,7 @@ def run_silver_cleaning(
         results: list[SilverCleaningResult] = []
         for dataset_name, dataframe in outputs:
             output_path = _resolve_path(f"data/silver/{dataset_name}", project_root)
-            row_count = _write_parquet(dataframe, output_path)
+            row_count = _write_table(dataframe, output_path)
             results.append(
                 SilverCleaningResult(
                     dataset_name=dataset_name,
@@ -368,6 +367,7 @@ def run_silver_cleaning(
 def _print_results(results: list[SilverCleaningResult], flag_counts: list[tuple[str, int]], run_id: str) -> None:
     print("FinSignal Lakehouse — Silver Cleaning Complete")
     print(f"silver_run_id: {run_id}")
+    print(f"storage format: {STORAGE_FORMAT}")
     print("-" * 72)
     for result in results:
         print(f"dataset:   {result.dataset_name}")
@@ -384,7 +384,7 @@ def _print_results(results: list[SilverCleaningResult], flag_counts: list[tuple[
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Clean bronze datasets into silver Parquet tables.",
+        description="Clean bronze datasets into silver tables.",
     )
     parser.add_argument(
         "--run-id",

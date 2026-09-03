@@ -17,7 +17,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from src.algorithms.reconciliation import build_position_reconstruction
-from src.utils.io import PROJECT_ROOT, create_spark_session
+from src.utils.io import PROJECT_ROOT, STORAGE_FORMAT, create_spark_session, read_table, write_table
 
 
 @dataclass
@@ -38,17 +38,17 @@ def _resolve_path(relative_path: str, project_root: Path) -> Path:
 
 def _load_silver_inputs(spark: SparkSession, project_root: Path) -> dict[str, DataFrame]:
     return {
-        "securities": spark.read.parquet(str(_resolve_path("data/silver/securities_clean", project_root))),
-        "prices": spark.read.parquet(str(_resolve_path("data/silver/prices_clean", project_root))),
-        "starting_positions": spark.read.parquet(
-            str(_resolve_path("data/silver/starting_positions_clean", project_root))
+        "securities": read_table(spark, _resolve_path("data/silver/securities_clean", project_root)),
+        "prices": read_table(spark, _resolve_path("data/silver/prices_clean", project_root)),
+        "starting_positions": read_table(
+            spark, _resolve_path("data/silver/starting_positions_clean", project_root)
         ),
-        "trades": spark.read.parquet(str(_resolve_path("data/silver/trades_clean", project_root))),
-        "reported_positions": spark.read.parquet(
-            str(_resolve_path("data/silver/reported_positions_clean", project_root))
+        "trades": read_table(spark, _resolve_path("data/silver/trades_clean", project_root)),
+        "reported_positions": read_table(
+            spark, _resolve_path("data/silver/reported_positions_clean", project_root)
         ),
-        "trade_quality_flags": spark.read.parquet(
-            str(_resolve_path("data/silver/trade_quality_flags", project_root))
+        "trade_quality_flags": read_table(
+            spark, _resolve_path("data/silver/trade_quality_flags", project_root)
         ),
     }
 
@@ -139,11 +139,9 @@ def run_gold_reconciliation(
 
         position_path = _resolve_path("data/gold/position_reconstruction", project_root)
         breaks_path = _resolve_path("data/gold/reconciliation_breaks", project_root)
-        position_path.parent.mkdir(parents=True, exist_ok=True)
-        breaks_path.parent.mkdir(parents=True, exist_ok=True)
 
-        position_reconstruction_df.write.mode("overwrite").parquet(str(position_path))
-        reconciliation_breaks_df.write.mode("overwrite").parquet(str(breaks_path))
+        write_table(position_reconstruction_df, position_path)
+        write_table(reconciliation_breaks_df, breaks_path)
 
         position_count = position_reconstruction_df.count()
         break_count = reconciliation_breaks_df.count()
@@ -187,6 +185,7 @@ def run_gold_reconciliation(
 def _print_summary(result: GoldReconciliationResult, run_id: str) -> None:
     print("FinSignal Lakehouse — Gold Reconciliation Complete")
     print(f"gold_run_id: {run_id}")
+    print(f"storage format: {STORAGE_FORMAT}")
     print("-" * 72)
     print(f"position_reconstruction row count: {result.position_reconstruction_count}")
     print(f"reconciliation_breaks row count:   {result.reconciliation_breaks_count}")

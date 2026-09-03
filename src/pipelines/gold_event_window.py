@@ -11,7 +11,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 from src.algorithms.event_window import build_event_window_metrics
-from src.utils.io import PROJECT_ROOT, create_spark_session
+from src.utils.io import PROJECT_ROOT, STORAGE_FORMAT, create_spark_session, read_table, write_table
 
 
 @dataclass
@@ -40,10 +40,10 @@ def run_gold_event_window(
     session = spark or create_spark_session("FinSignal Gold Event Window")
 
     try:
-        prices_df = session.read.parquet(str(_resolve_path("data/silver/prices_clean", project_root)))
-        events_df = session.read.parquet(str(_resolve_path("data/silver/events_clean", project_root)))
-        position_df = session.read.parquet(
-            str(_resolve_path("data/gold/position_reconstruction", project_root))
+        prices_df = read_table(session, _resolve_path("data/silver/prices_clean", project_root))
+        events_df = read_table(session, _resolve_path("data/silver/events_clean", project_root))
+        position_df = read_table(
+            session, _resolve_path("data/gold/position_reconstruction", project_root)
         )
 
         metrics_df = build_event_window_metrics(
@@ -53,8 +53,7 @@ def run_gold_event_window(
         ).withColumn("_gold_processed_at", F.current_timestamp())
 
         output_path = _resolve_path("data/gold/event_window_metrics", project_root)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        metrics_df.write.mode("overwrite").parquet(str(output_path))
+        write_table(metrics_df, output_path)
 
         event_count = events_df.select("event_id", "security_id").dropDuplicates().count()
         output_count = metrics_df.count()
@@ -94,6 +93,7 @@ def run_gold_event_window(
 def _print_summary(result: GoldEventWindowResult, run_id: str) -> None:
     print("FinSignal Lakehouse — Gold Event Window Complete")
     print(f"gold_event_run_id: {run_id}")
+    print(f"storage format: {STORAGE_FORMAT}")
     print("-" * 72)
     print(f"event count:                 {result.event_count}")
     print(f"output row count:            {result.output_row_count}")

@@ -13,7 +13,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from src.retrieval.build_vector_index import COLLECTION_NAME, MODEL_NAME
-from src.utils.io import PROJECT_ROOT, create_spark_session
+from src.utils.io import PROJECT_ROOT, create_spark_session, read_table
 
 try:
     from langchain_chroma import Chroma
@@ -124,9 +124,9 @@ def _load_silver_events(session: SparkSession, project_root: Path) -> DataFrame:
     events_clean = _resolve_path("data/silver/events_clean", project_root)
     filing_events_clean = _resolve_path("data/silver/filing_events_clean", project_root)
     if events_clean.exists():
-        return session.read.parquet(str(events_clean))
+        return read_table(session, events_clean)
     if filing_events_clean.exists():
-        return session.read.parquet(str(filing_events_clean))
+        return read_table(session, filing_events_clean)
     raise FileNotFoundError("Neither data/silver/events_clean nor data/silver/filing_events_clean exists.")
 
 
@@ -141,14 +141,14 @@ def run_investigation_graph(
     session = spark or create_spark_session("FinSignal Investigation Graph")
 
     try:
-        reconciliation_breaks = session.read.parquet(
-            str(_resolve_path("data/gold/reconciliation_breaks", project_root))
+        reconciliation_breaks = read_table(
+            session, _resolve_path("data/gold/reconciliation_breaks", project_root)
         )
-        trade_quality_flags = session.read.parquet(
-            str(_resolve_path("data/silver/trade_quality_flags", project_root))
+        trade_quality_flags = read_table(
+            session, _resolve_path("data/silver/trade_quality_flags", project_root)
         )
-        event_window_metrics = session.read.parquet(
-            str(_resolve_path("data/gold/event_window_metrics", project_root))
+        event_window_metrics = read_table(
+            session, _resolve_path("data/gold/event_window_metrics", project_root)
         )
         events_clean = _load_silver_events(session, project_root).select(
             "event_id",
@@ -157,8 +157,8 @@ def run_investigation_graph(
             "event_type",
             "event_summary",
         )
-        _ = session.read.parquet(  # explicitly loaded per requirement input list
-            str(_resolve_path("data/gold/position_reconstruction", project_root))
+        _ = read_table(  # explicitly loaded per requirement input list
+            session, _resolve_path("data/gold/position_reconstruction", project_root)
         )
 
         # ------------------------------------------------------------------

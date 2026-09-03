@@ -18,7 +18,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-from src.utils.io import PROJECT_ROOT, create_spark_session
+from src.utils.io import PROJECT_ROOT, create_spark_session, read_table
 
 
 @dataclass
@@ -36,9 +36,9 @@ def _load_events_clean(spark: SparkSession, project_root: Path) -> DataFrame:
     primary = _resolve_path("data/silver/events_clean", project_root)
     fallback = _resolve_path("data/silver/filing_events_clean", project_root)
     if primary.exists():
-        return spark.read.parquet(str(primary))
+        return read_table(spark, primary)
     if fallback.exists():
-        return spark.read.parquet(str(fallback))
+        return read_table(spark, fallback)
     raise FileNotFoundError("Neither data/silver/events_clean nor data/silver/filing_events_clean exists.")
 
 
@@ -271,13 +271,13 @@ def run_build_investigation_corpus(
     )
 
     try:
-        reconciliation_breaks_df = session.read.parquet(
-            str(_resolve_path("data/gold/reconciliation_breaks", project_root))
+        reconciliation_breaks_df = read_table(
+            session, _resolve_path("data/gold/reconciliation_breaks", project_root)
         )
-        event_window_df = session.read.parquet(str(_resolve_path("data/gold/event_window_metrics", project_root)))
+        event_window_df = read_table(session, _resolve_path("data/gold/event_window_metrics", project_root))
         events_clean_df = _load_events_clean(session, project_root)
-        trades_df = session.read.parquet(str(_resolve_path("data/silver/trades_clean", project_root)))
-        flags_df = session.read.parquet(str(_resolve_path("data/silver/trade_quality_flags", project_root)))
+        trades_df = read_table(session, _resolve_path("data/silver/trades_clean", project_root))
+        flags_df = read_table(session, _resolve_path("data/silver/trade_quality_flags", project_root))
 
         recon_docs = _reconciliation_break_docs(reconciliation_breaks_df)
         event_docs = _event_window_docs(event_window_df, events_clean_df)

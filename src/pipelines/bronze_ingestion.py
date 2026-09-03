@@ -2,7 +2,7 @@
 Bronze ingestion pipeline for FinSignal Lakehouse.
 
 Reads raw JSONL datasets, preserves source fields, adds bronze metadata,
-and writes Parquet outputs. No silver cleaning or business validation.
+and writes lakehouse tables. No silver cleaning or business validation.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, current_timestamp, input_file_name, lit, sha2, struct, to_json
 
-from src.utils.io import PROJECT_ROOT, create_spark_session
+from src.utils.io import PROJECT_ROOT, STORAGE_FORMAT, create_spark_session, write_table
 
 # ---------------------------------------------------------------------------
 # Explicit raw -> bronze dataset mapping
@@ -111,7 +111,7 @@ def ingest_dataset(
     bronze_path: Path,
     load_id: str,
 ) -> BronzeIngestionResult:
-    """Read one raw JSONL dataset and write bronze Parquet with metadata."""
+    """Read one raw JSONL dataset and write bronze table output with metadata."""
     if not raw_path.exists():
         raise FileNotFoundError(f"Raw path does not exist for {dataset_name}: {raw_path}")
 
@@ -122,8 +122,8 @@ def ingest_dataset(
     row_count = bronze_df.count()
     bronze_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # MVP uses full overwrite per dataset load.
-    bronze_df.write.mode("overwrite").parquet(str(bronze_path))
+  # MVP uses full overwrite per dataset load.
+    write_table(bronze_df, bronze_path)
 
     return BronzeIngestionResult(
         dataset_name=dataset_name,
@@ -139,7 +139,7 @@ def run_bronze_ingestion(
     project_root: Path = PROJECT_ROOT,
     spark: SparkSession | None = None,
 ) -> list[BronzeIngestionResult]:
-    """Ingest all configured raw datasets into bronze Parquet tables."""
+    """Ingest all configured raw datasets into bronze tables."""
     owns_spark = spark is None
     session = spark or create_spark_session("FinSignal Bronze Ingestion")
 
@@ -167,6 +167,7 @@ def run_bronze_ingestion(
 def _print_results(results: list[BronzeIngestionResult], load_id: str) -> None:
     print("FinSignal Lakehouse — Bronze Ingestion Complete")
     print(f"bronze_load_id: {load_id}")
+    print(f"storage format: {STORAGE_FORMAT}")
     print("-" * 72)
     for result in results:
         print(f"dataset:     {result.dataset_name}")
@@ -178,7 +179,7 @@ def _print_results(results: list[BronzeIngestionResult], load_id: str) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Ingest raw JSONL datasets into bronze Parquet tables.",
+        description="Ingest raw JSONL datasets into bronze tables.",
     )
     parser.add_argument(
         "--load-id",
