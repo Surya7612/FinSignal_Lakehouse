@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(pybind11)
 add_library(finsignal_core STATIC
   src/event_engine.cpp
 )
+set_target_properties(finsignal_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(finsignal_core PUBLIC include)
 
 pybind11_add_module(finsignal_engine src/bindings.cpp)
