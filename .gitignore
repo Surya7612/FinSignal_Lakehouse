@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated lakehouse outputs (reproduce with: bash scripts/run_all.sh)
+data/bronze/
+data/silver/
+data/gold/
+data/retrieval/
+
+# C++ / local build outputs
+build/cpp/
+.pytest_cache/

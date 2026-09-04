@@ -122,7 +122,7 @@ def ingest_dataset(
     row_count = bronze_df.count()
     bronze_path.parent.mkdir(parents=True, exist_ok=True)
 
-  # MVP uses full overwrite per dataset load.
+  # v1 uses full overwrite per dataset load.
     write_table(bronze_df, bronze_path)
 
     return BronzeIngestionResult(

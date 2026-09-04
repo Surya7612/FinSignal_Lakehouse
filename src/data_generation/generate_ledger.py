@@ -444,7 +444,7 @@ class LedgerGenerator:
     """
     Generate a single in-window stock split corporate action.
 
-    This is a controlled MVP extension and intentionally supports STOCK_SPLIT
+    This is a controlled v1 extension and intentionally supports STOCK_SPLIT
     only (no dividends/mergers/spin-offs).
     """
     # Pick a deterministic mid-window effective date so both pre/post windows exist.

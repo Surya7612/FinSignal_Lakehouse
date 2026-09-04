@@ -1,4 +1,4 @@
-"""Stock-split adjustment helpers (MVP: STOCK_SPLIT only)."""
+"""Stock-split adjustment helpers (STOCK_SPLIT only)."""
 
 from __future__ import annotations
 

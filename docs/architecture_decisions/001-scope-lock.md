@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-The MVP will focus on a batch-first financial lakehouse for trade-position reconciliation and bounded event-window analytics.
+v1 will focus on a batch-first financial lakehouse for trade-position reconciliation and bounded event-window analytics.
 
 The core system will ingest raw trade, price, starting position, reported position, security, and event data; process it through bronze/silver/gold layers; reconstruct expected positions from trade activity; detect reconciliation breaks; classify likely break reasons; and produce investigation-ready gold outputs.
 
@@ -35,9 +35,9 @@ The highest-value part of the project is trade-position reconciliation. It demon
 
 This is stronger than building a generic financial RAG chatbot or shallow lakehouse demo.
 
-## Chosen MVP Scope
+## Chosen v1 Scope
 
-The MVP includes:
+v1 includes:
 
 * securities
 * prices
@@ -57,9 +57,9 @@ The MVP includes:
 * C++ reference engine with parity tests
 * architecture and tradeoff documentation
 
-## Explicitly Excluded From MVP
+## Explicitly Excluded From v1
 
-The MVP excludes:
+v1 excludes:
 
 * broad corporate-action coverage beyond stock splits
 * macro indicators
@@ -86,7 +86,7 @@ Rejected because it is common and does not strongly demonstrate data engineering
 
 ## 2. SEC Filing Analysis Platform
 
-Rejected for MVP because full SEC ingestion and document parsing can become a large project by itself.
+Rejected for v1 because full SEC ingestion and document parsing can become a large project by itself.
 
 ## 3. Trading Bot
 
@@ -98,7 +98,7 @@ Rejected because prediction quality would be hard to prove and could distract fr
 
 ## 5. Broad Financial Lakehouse
 
-Rejected for MVP because too many datasets would create shallow implementation and synthetic data complexity.
+Rejected for v1 because too many datasets would create shallow implementation and synthetic data complexity.
 
 ## 6. Healthcare Lakehouse
 
@@ -108,13 +108,13 @@ Rejected for this project because the current target is finance/data infrastruct
 
 ## 1. Checkpointed Starting Positions
 
-The MVP uses starting position snapshots as trusted baselines.
+v1 uses starting position snapshots as trusted baselines.
 
 This avoids reconstructing full account history from inception.
 
 Trade-position reconciliation is calculated over a fixed 30-day window.
 
-This keeps the MVP manageable while still demonstrating realistic reconciliation logic.
+This keeps v1 manageable while still demonstrating realistic reconciliation logic.
 
 ## 2. Controlled Synthetic Ledger
 
@@ -126,7 +126,7 @@ The injected issues manifest records the known breaks and expected detection cat
 
 ## 3. Batch-First Lakehouse
 
-The MVP is batch-first because daily reconciliation and event analytics do not require streaming in the first version.
+v1 is batch-first because daily reconciliation and event analytics do not require streaming in the first version.
 
 Streaming could be added later for intraday trade monitoring or live break detection.
 
@@ -181,7 +181,7 @@ These are acceptable tradeoffs because the first priority is to build a working,
 
 ## Scalability Considerations
 
-The MVP runs locally or in a small PySpark/Databricks environment.
+v1 runs locally or in a small PySpark/Databricks environment.
 
 The architecture is still designed to scale conceptually:
 
@@ -196,7 +196,7 @@ The architecture is still designed to scale conceptually:
 
 ## Latency Considerations
 
-The MVP is batch-first.
+v1 is batch-first.
 
 This is intentional because position reconciliation and event-window analytics are acceptable as scheduled batch workflows.
 
@@ -204,7 +204,7 @@ Streaming would reduce freshness latency but would add complexity before the cor
 
 In production, streaming could be added for intraday trades or live reconciliation alerts.
 
-## AI Boundary
+## Investigation Boundary
 
 The investigation layer is downstream.
 
@@ -231,6 +231,6 @@ Future production improvements may include:
 
 ## Final Scope Lock
 
-The MVP is complete when the structured pipeline, manifest validation, cross-engine parity checks, and deterministic investigation workflow all pass under `bash scripts/run_all.sh`.
+v1 is complete when the structured pipeline, manifest validation, cross-engine parity checks, and deterministic investigation workflow all pass under `bash scripts/run_all.sh`.
 
-Do not add broad corporate-action coverage, macro data, full SEC ingestion, LLM generation, Databricks deployment artifacts, Airflow, Kafka, dashboard/UI, or stock prediction beyond the locked MVP scope above.
+Do not add broad corporate-action coverage, macro data, full SEC ingestion, LLM generation, Databricks deployment artifacts, Airflow, Kafka, dashboard/UI, or stock prediction beyond the locked v1 scope above.

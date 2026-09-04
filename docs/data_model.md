@@ -2,9 +2,9 @@
 
 ## 1. Purpose
 
-This document defines the data model for the FinSignal Lakehouse MVP.
+This document defines the data model for the FinSignal Lakehouse v1.
 
-The MVP focuses on trade-position reconciliation and bounded event-window analytics. The core data entities are securities, prices, corporate actions (stock splits only), starting positions, trades, reported positions, filing-style events, and an injected issues manifest.
+v1 focuses on trade-position reconciliation and bounded event-window analytics. The core data entities are securities, prices, corporate actions (stock splits only), starting positions, trades, reported positions, filing-style events, and an injected issues manifest.
 
 The data model supports three layers:
 
@@ -168,7 +168,7 @@ One row per account, security, and baseline position date.
 
 Starting positions are trusted checkpoint baselines.
 
-The MVP does not reconstruct full account history from inception. It reconstructs expected positions over the reconciliation window using:
+v1 does not reconstruct full account history from inception. It reconstructs expected positions over the reconciliation window using:
 
 `starting quantity + cumulative buys - cumulative sells`
 
@@ -203,7 +203,7 @@ One row per corporate action event.
 
 ### Notes
 
-The MVP supports stock splits only. Split adjustment uses cumulative factors by security and date. This is a controlled extension, not a full corporate-actions engine.
+v1 supports stock splits only. Split adjustment uses cumulative factors by security and date. This is a controlled extension, not a full corporate-actions engine.
 
 ---
 

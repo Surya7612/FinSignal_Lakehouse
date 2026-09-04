@@ -317,12 +317,12 @@ The project should separate:
 
 ## 2.5 Scalability Awareness
 
-The MVP can run locally, but the architecture should be designed with scalability in mind.
+v1 can run locally, but the architecture should be designed with scalability in mind.
 
 The project should document:
 
 * why checkpointed starting positions are used
-* why full historical reconstruction is avoided in MVP
+* why full historical reconstruction is avoided in v1
 * how partitions would be chosen
 * how cumulative windows could become expensive
 * how event-window joins avoid Cartesian products
@@ -330,11 +330,11 @@ The project should document:
 
 ## 2.6 Latency Awareness
 
-The MVP is batch-first.
+v1 is batch-first.
 
 The project should document that batch processing is acceptable for daily reconciliation and event analytics.
 
-Streaming is intentionally excluded from the MVP.
+Streaming is intentionally excluded from v1.
 
 ## 2.7 Storage Format
 
@@ -358,9 +358,9 @@ The README and docs must explain:
 * limitations
 * future improvements
 
-## 3. MVP Constraints
+## 3. v1 Constraints
 
-The MVP must not include:
+v1 must not include:
 
 1. Broad corporate-action coverage beyond stock splits
 2. Macro indicators
@@ -379,7 +379,7 @@ The MVP must not include:
 
 ## 4. Definition of Done
 
-The MVP is complete when:
+v1 is complete when:
 
 1. Synthetic raw data is generated for securities, prices, corporate actions, starting positions, trades, reported positions, and filing events.
 2. An injected issues manifest is generated.

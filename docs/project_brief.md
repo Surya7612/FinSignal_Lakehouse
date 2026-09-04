@@ -2,41 +2,21 @@
 
 ## 1. Project Name
 
-**FinSignal Lakehouse — Trade-Position Reconciliation & Event Analytics Platform**
+**FinSignal Lakehouse — Trade–Position Reconciliation & Event Analytics**
 
 ## 2. One-Sentence Summary
 
-FinSignal Lakehouse is a PySpark-based financial data engineering platform that ingests raw trade, price, position, security, and event data, processes it through bronze/silver/gold lakehouse layers, reconstructs expected positions from trade activity, detects reconciliation breaks, validates detections against a ground-truth manifest, computes bounded event-window analytics, and supports deterministic evidence-based investigation using curated lakehouse outputs.
+FinSignal Lakehouse is a PySpark-based financial data system that ingests raw trade, price, position, security, and event data, processes it through bronze/silver/gold lakehouse layers, reconstructs expected positions from trade activity, detects reconciliation breaks, validates detections against a ground-truth manifest, computes bounded event-window analytics, and supports deterministic evidence-based investigation using curated lakehouse outputs.
 
-## 3. Why I Am Building This
+## 3. Purpose
 
-I am building this project to learn and demonstrate how financial data platforms support reliable reconciliation, analytics, and evidence-based investigation.
+The project focuses on a realistic financial data engineering problem: reconciling trades against reported positions.
 
-Instead of building a generic financial chatbot, trading bot, or stock prediction model, this project focuses on a more realistic financial data engineering problem: reconciling trades against reported positions.
+In financial systems, data quality matters before downstream analytics can be trusted. A position mismatch can come from duplicate trades, missing trades, late-arriving records, timing mismatches, invalid securities, missing prices, or incorrect position reports. This system detects those issues, classifies them, and produces investigation-ready gold-layer outputs.
 
-In financial systems, data quality matters before AI or analytics can be trusted. A position mismatch can come from duplicate trades, missing trades, late-arriving records, timing mismatches, invalid securities, missing prices, or incorrect position reports. This project gives me a focused way to build a system that detects those issues, classifies them, and produces investigation-ready gold-layer outputs.
+It is intentionally not a trading bot, stock predictor, portfolio optimizer, or generic financial chatbot.
 
-The project is designed to strengthen four areas:
-
-1. Financial data modeling
-2. PySpark and lakehouse data engineering
-3. Algorithmic reconciliation and time-series processing
-4. Optional evidence-based investigation built on reliable structured data
-
-## 4. Target Roles
-
-This project is designed to support applications for:
-
-* Data Engineering roles
-* Financial Data Engineering roles
-* Data Platform roles
-* Quantitative Data Infrastructure roles
-* McKinsey / QuantumBlack-style data and AI engineering roles
-* HRT-style data production, data infrastructure, and research platform roles
-
-The project is not intended to claim trading alpha, stock prediction ability, portfolio optimization, or buy/sell recommendation logic.
-
-## 5. Core Problem
+## 4. Core Problem
 
 Financial data often comes from separate systems:
 
@@ -52,21 +32,19 @@ The core question this project answers is:
 
 **Given raw trades, starting positions, reported positions, price data, and event data, can the system reconstruct expected positions, compare them against reported positions, detect breaks, classify likely causes, and produce investigation-ready outputs?**
 
-## 6. MVP Focus
+## 5. Scope Focus
 
-The MVP focuses deeply on one structured financial data engineering problem:
+v1 focuses on one structured problem:
 
 **Trade-position reconciliation.**
 
-A secondary module will compute event-window analytics around filing-style events.
+A secondary module computes event-window analytics around filing-style events.
 
-The AI layer is optional and downstream. It should not carry the project.
+The retrieval/investigation layer is downstream of gold outputs. Structured reconciliation must work before that layer matters.
 
-The MVP should prove that the structured data pipeline works before any retrieval or AI layer is added.
+## 6. Data Entities
 
-## 7. MVP Data Entities
-
-The MVP includes only these entities:
+v1 includes only these entities:
 
 ### Required Entities
 
@@ -77,7 +55,7 @@ The MVP includes only these entities:
    Daily price data by security and trading date.
 
 3. **corporate_actions**
-   Stock-split corporate actions (MVP: `STOCK_SPLIT` only).
+   Stock-split corporate actions (`STOCK_SPLIT` only).
 
 4. **starting_positions**
    Trusted baseline positions at the beginning of the reconciliation window.
@@ -97,14 +75,14 @@ The MVP includes only these entities:
 ### Optional Later Entities
 
 1. **event_notes**
-   Short text notes for optional AI retrieval.
+   Short text notes for optional retrieval.
 
 2. **accounts**
    Separate account reference table, only if account modeling needs to become more explicit.
 
-## 8. Explicitly Out of Scope for MVP
+## 7. Explicitly Out of Scope
 
-The MVP will not include:
+v1 does not include:
 
 * Broad corporate-action coverage beyond stock splits
 * Macro indicators
@@ -122,10 +100,11 @@ The MVP will not include:
 * Bloomberg/Refinitiv-style data
 * LLM-generated investigation summaries
 * UI/dashboard
+* Cloud deployment packaging
 
 These are intentionally excluded to keep the first version focused and buildable.
 
-## 9. Core Architecture
+## 8. Core Architecture
 
 The project uses a batch-first bronze/silver/gold lakehouse architecture.
 
@@ -180,7 +159,7 @@ Examples:
 * silver_trade_quality_flags
 * gold_event_window_metrics
 
-## 10. Data Generation Strategy
+## 9. Data Generation Strategy
 
 The first milestone is not to generate a large financial universe.
 
@@ -198,7 +177,7 @@ The generator should follow this order:
 
 This prevents random synthetic data from becoming meaningless. The data generator should produce controlled errors that the reconciliation engine can later detect and classify.
 
-## 11. MVP Data Scale
+## 10. Data Scale
 
 The first version should stay intentionally small:
 
@@ -210,9 +189,9 @@ The first version should stay intentionally small:
 
 The reconciliation window should be limited to 30 days for the first version.
 
-The project may later add a scale-test mode with 60–90 days or larger trade counts, but only after the MVP works correctly.
+The project may later add a scale-test mode with 60–90 days or larger trade counts, but only after v1 works correctly.
 
-## 12. Injected Data-Quality Issues
+## 11. Injected Data-Quality Issues
 
 The generator must intentionally create these issue types:
 
@@ -243,7 +222,7 @@ The generator must intentionally create these issue types:
 9. **Split-adjustment breaks**
    Reported positions intentionally mishandle stock-split effective dates.
 
-## 13. Injected Issues Manifest
+## 12. Injected Issues Manifest
 
 The generator must output an `injected_issues_manifest`.
 
@@ -264,7 +243,7 @@ The manifest is used to validate whether the pipeline correctly detects known is
 
 This makes the project testable against known ground truth.
 
-## 14. Storage Format Decision
+## 13. Storage Format Decision
 
 The project avoids CSV as the primary format.
 
@@ -281,7 +260,7 @@ Raw JSON
 
 CSV may only be used for quick manual inspection, not as the main storage format.
 
-## 15. Main Algorithmic Module: Trade-Position Reconciliation
+## 14. Main Algorithmic Module: Trade-Position Reconciliation
 
 The main algorithmic module is the trade-position reconciliation engine.
 
@@ -324,9 +303,9 @@ Possible reason codes:
 * QUANTITY_MISMATCH
 * POSITION_NOT_REPORTED
 
-## 16. Position Tracking Design
+## 15. Position Tracking Design
 
-The MVP does not reconstruct full account history from inception.
+v1 does not reconstruct full account history from inception.
 
 Instead, it uses a checkpointed baseline approach:
 
@@ -337,9 +316,9 @@ Trusted starting position as of Day 0
 
 This is intentional.
 
-Full historical reconstruction can require large cumulative windows and stateful tracking. A checkpointed approach is more realistic for an MVP and mirrors how production systems often limit reconciliation windows using trusted snapshots.
+Full historical reconstruction can require large cumulative windows and stateful tracking. A checkpointed approach is more realistic for v1 and mirrors how production systems often limit reconciliation windows using trusted snapshots.
 
-## 17. Secondary Algorithmic Module: Event-Window Analytics
+## 16. Secondary Algorithmic Module: Event-Window Analytics
 
 The secondary module is event-window analytics.
 
@@ -366,18 +345,18 @@ Preferred design:
 
 This avoids accidental Cartesian products and keeps the event analytics scalable in design.
 
-## 18. Optional AI Layer
+## 17. Investigation Layer
 
-The AI layer is optional and should come only after the structured pipeline works.
+The investigation layer is downstream of gold outputs and does not use LLM generation.
 
-The AI layer may answer questions like:
+It may answer questions like:
 
 * Why was there a reconciliation break for AAPL on this date?
 * What trades contributed to this position mismatch?
 * Was there a nearby event that could explain the exposure change?
 * What does the event note say about the company around this date?
 
-The AI layer should retrieve from curated data, not raw untrusted records.
+It retrieves from curated silver/gold outputs, not raw untrusted records.
 
 Possible retrieval sources:
 
@@ -389,7 +368,7 @@ Possible retrieval sources:
 
 The structured lakehouse remains the source of truth. The vector index is only a downstream retrieval layer.
 
-## 19. Vector Store Boundary
+## 18. Vector Store Boundary
 
 If a vector database is added, it is treated as a downstream serving layer.
 
@@ -397,7 +376,7 @@ The lakehouse owns clean structured and text/event tables.
 
 The vector store consumes curated silver or gold outputs.
 
-For the MVP, FAISS or Chroma may be used locally, but this must be documented as a single-node prototype.
+For the v1, FAISS or Chroma may be used locally, but this must be documented as a single-node prototype.
 
 Production alternatives include:
 
@@ -407,9 +386,9 @@ Production alternatives include:
 * embedding refresh logic
 * document version tracking
 
-## 20. Main System Questions
+## 19. Main System Questions
 
-The finished MVP should answer:
+v1 should answer:
 
 1. Did reported positions match positions reconstructed from trades?
 2. Which trades contributed to a position mismatch?
@@ -419,9 +398,9 @@ The finished MVP should answer:
 6. How did price and position behavior change around a filing event?
 7. What gold-layer outputs would an analyst or data engineer use to investigate the issue?
 
-## 21. Success Criteria
+## 20. Success Criteria
 
-The MVP is successful if it can:
+Success means the system can:
 
 1. Generate controlled synthetic financial ledger data.
 2. Inject known data-quality and reconciliation issues.
@@ -437,7 +416,7 @@ The MVP is successful if it can:
 12. Save gold outputs as Parquet or Delta-style tables.
 13. Document architecture choices, tradeoffs, scalability concerns, and limitations.
 
-## 22. Build Milestones
+## 21. Build Milestones
 
 ### Milestone 1 — Controlled Synthetic Ledger Generator
 
@@ -471,15 +450,15 @@ Compute bounded event-window metrics around filing events using trading-day inde
 
 ### Milestone 6 — Deterministic Investigation Workflow
 
-Build investigation corpus documents, vector index, deterministic LangGraph workflow, and groundedness evaluation. No LLM generation.
+Build investigation corpus documents, vector index, a small deterministic workflow, and groundedness evaluation. No LLM generation.
 
 ### Milestone 7 — Validation and Reference Engines
 
 Add manifest-driven validation, cross-engine consistency checks, and a C++20/pybind11 reference reconciliation engine with parity tests.
 
-## 23. Scope Lock
+## 22. Scope Lock
 
-The MVP is locked to:
+Scope is locked to:
 
 * securities
 * prices

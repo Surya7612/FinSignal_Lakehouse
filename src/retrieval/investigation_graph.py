@@ -1,4 +1,8 @@
-"""Deterministic LangGraph investigation workflow (no LLM calls)."""
+"""Deterministic investigation workflow (no LLM calls).
+
+Uses a small LangGraph state machine to orchestrate metadata lookup,
+evidence retrieval, and packet assembly over curated gold outputs.
+"""
 
 from __future__ import annotations
 

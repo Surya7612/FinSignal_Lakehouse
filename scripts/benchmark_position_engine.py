@@ -60,7 +60,7 @@ def benchmark(*, iterations: int = 3, project_root: Path = PROJECT_ROOT) -> dict
         else None,
         "cpp_available": cpp_available,
         "note": (
-            "Parity is the primary C++ validation metric at MVP scale; "
+            "Parity is the primary C++ validation metric at current scale; "
             "pybind marshalling dominates latency for small datasets."
         ),
     }
