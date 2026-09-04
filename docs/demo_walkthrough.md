@@ -1,6 +1,6 @@
 # FinSignal Lakehouse — Demo Walkthrough
 
-This walkthrough is written for interview/demo use. It explains the problem, architecture, one concrete reconciliation case, and how ground truth validates the pipeline.
+End-to-end walkthrough of the reconciliation problem, architecture, one concrete break case, and how ground-truth validation works.
 
 ## 1. Problem
 
@@ -190,15 +190,7 @@ Expected (seed 42):
 - LLM-generated investigation summaries
 - streaming orchestration platform
 
-## 9. Suggested 90-Second Interview Narrative
-
-1. “I modeled a realistic ops problem: reconciling trades against reported positions over a 30-day window.”
-2. “I generate controlled synthetic data, inject known anomalies, and store ground truth in a manifest.”
-3. “Bronze/silver/gold Delta pipelines reconstruct expected holdings and classify breaks; split-adjustment is a first-class break type.”
-4. “I validate detection against the manifest and cross-check Spark gold against Python/C++ reference engines.”
-5. “For investigation, I combine structured gold outputs with retrieved evidence and score groundedness deterministically—no LLM hand-waving.”
-
-## 10. Quick Verification Checklist
+## 9. Quick Verification Checklist
 
 - [ ] `bash scripts/run_all.sh` completes successfully
 - [ ] `python -m src.validation.manifest_validation` shows 17/17 detected

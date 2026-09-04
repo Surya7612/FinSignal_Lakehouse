@@ -154,7 +154,7 @@ FinSignal_Lakehouse/
 │   ├── gold/                 # Reconciliation and event-window outputs
 │   └── retrieval/            # Investigation corpus and vector index
 ├── docs/
-│   ├── demo_walkthrough.md   # Interview/demo narrative
+│   ├── demo_walkthrough.md   # End-to-end verification walkthrough
 │   ├── project_brief.md
 │   ├── requirements.md
 │   ├── data_model.md

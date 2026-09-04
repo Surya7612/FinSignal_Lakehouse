@@ -31,7 +31,7 @@ The original project idea included too many components:
 
 This was too broad for a solo project under time pressure.
 
-The highest-value and most defensible part of the project is trade-position reconciliation. It demonstrates financial data modeling, PySpark engineering, deterministic algorithms, data quality checks, time-series processing, and practical understanding of financial operations.
+The highest-value part of the project is trade-position reconciliation. It demonstrates financial data modeling, PySpark engineering, deterministic algorithms, data quality checks, time-series processing, and practical understanding of financial operations.
 
 This is stronger than building a generic financial RAG chatbot or shallow lakehouse demo.
 
@@ -90,7 +90,7 @@ Rejected for MVP because full SEC ingestion and document parsing can become a la
 
 ## 3. Trading Bot
 
-Rejected because it is overdone, difficult to validate, and risky to defend seriously in interviews.
+Rejected because it is overdone, difficult to validate, and weak as a serious systems project.
 
 ## 4. Stock Prediction Model
 
@@ -158,7 +158,7 @@ It must not replace deterministic reconciliation logic or generate unsupported f
 
 ## Benefits
 
-This scope is focused, realistic, and interview-defensible.
+This scope is focused and realistic.
 
 It allows the project to go deep on:
 

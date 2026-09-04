@@ -123,7 +123,7 @@ The MVP will not include:
 * LLM-generated investigation summaries
 * UI/dashboard
 
-These are intentionally excluded to keep the first version focused, buildable, and interview-defensible.
+These are intentionally excluded to keep the first version focused and buildable.
 
 ## 9. Core Architecture
 
@@ -262,7 +262,7 @@ Each issue record should include:
 
 The manifest is used to validate whether the pipeline correctly detects known issues.
 
-This makes the project testable and interview-defensible.
+This makes the project testable against known ground truth.
 
 ## 14. Storage Format Decision
 
@@ -436,7 +436,6 @@ The MVP is successful if it can:
 11. Compute bounded event-window analytics around filing events.
 12. Save gold outputs as Parquet or Delta-style tables.
 13. Document architecture choices, tradeoffs, scalability concerns, and limitations.
-14. Explain the full project clearly in a technical interview.
 
 ## 22. Build Milestones
 
@@ -478,13 +477,7 @@ Build investigation corpus documents, vector index, deterministic LangGraph work
 
 Add manifest-driven validation, cross-engine consistency checks, and a C++20/pybind11 reference reconciliation engine with parity tests.
 
-## 23. Interview Positioning
-
-The strongest interview explanation is:
-
-“I built FinSignal Lakehouse to understand how financial data platforms support reconciliation, analytics, and evidence-based investigation. I focused first on the data foundation: ingesting raw trade, price, position, and event data, cleaning it through bronze and silver layers, reconstructing expected positions from trade activity, and producing gold-layer reconciliation breaks. I intentionally injected known data-quality issues and validated detection against a ground-truth manifest. I added bounded event-window analytics, a deterministic investigation workflow with groundedness checks, and a C++ reference engine parity-tested against Spark and Python outputs.”
-
-## 24. Scope Lock
+## 23. Scope Lock
 
 The MVP is locked to:
 

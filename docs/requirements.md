@@ -344,7 +344,7 @@ Bronze, silver, and gold data must be Parquet or Delta-style tables.
 
 CSV must not be used as the main storage format.
 
-## 2.8 Interview Readiness
+## 2.8 Documentation
 
 The README and docs must explain:
 
@@ -396,7 +396,6 @@ The MVP is complete when:
 13. Cross-engine consistency checks pass for Python/C++ reference engines.
 14. Deterministic investigation workflow and groundedness evaluation work.
 15. Documentation explains design decisions and tradeoffs.
-16. The project can be explained clearly in a technical interview.
 
 ## 5. Reproducible Run
 
